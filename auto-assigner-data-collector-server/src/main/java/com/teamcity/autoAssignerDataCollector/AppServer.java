@@ -55,33 +55,21 @@ public class AppServer extends BaseController {
             throw new HttpRequestMethodNotSupportedException(request.getMethod());
         }
 
+        @Nullable SProject project = getProjectByExternalId(request.getParameter("projectExternalId"));
+
 //        HashMap<Integer, String> responsibilities = new HashMap<>();
         List<BuildInfo> builds = new ArrayList<>();
         server.getHistory().getEntries(true).forEach(sFinishedBuild -> {
-            BuildInfo buildInfo = new BuildInfo(sFinishedBuild);
-//            sFinishedBuild.getFullStatistics().getAllTests().forEach(test -> {
-//                if (test.isNewFailure()) {
-//                    SBuild firstFailed = test.getFirstFailed();
-//                    assert firstFailed == null || firstFailed.getBuildId() == test.getBuildId();
-//                    List<TestNameResponsibilityEntry> assignees = test.getTest().getAllResponsibilities();
-//                    assignees.forEach(assignee -> {
-//                        User user = assignee.getResponsibleUser();
-//                        ResponsibilityEntry.State state = assignee.getState();
-//                        if (state.isActive()) {
-//                            responsibilities.put(test.getTestRunId(), user.getExtendedName());
-//                        } else if (state.isFixed()) {
-//                            responsibilities.put(0, user.getExtendedName());
-//                        }
-//                    });
-//                }
-//            });
-            HashMap<Long, String> previousResponsible = new HashMap<>(findInAudit(sFinishedBuild.getFullStatistics().getAllTests(),
-                    getProjectByExternalId(sFinishedBuild.getProjectExternalId())));
-            buildInfo.setPreviousResponsible(previousResponsible);
-            builds.add(buildInfo);
+            if (sFinishedBuild.getProjectId().equals(project.getProjectId())) {
+                BuildInfo buildInfo = new BuildInfo(sFinishedBuild);
+
+                HashMap<Long, String> previousResponsible = new HashMap<>(findInAudit(sFinishedBuild.getFullStatistics().getAllTests(),
+                        getProjectByExternalId(sFinishedBuild.getProjectExternalId())));
+                buildInfo.setPreviousResponsible(previousResponsible);
+                builds.add(buildInfo);
+            }
         });
 
-//        @Nullable SProject project = getProjectByExternalId(request.getParameter("projectExternalId"));
         sendResponse(response, builds);
         return null;
     }
