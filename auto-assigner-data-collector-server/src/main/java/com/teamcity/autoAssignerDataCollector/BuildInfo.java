@@ -14,7 +14,6 @@ import java.util.stream.Stream;
 class BuildInfo {
     private final long buildId;
     private final Date clientDate;
-    //    private final String owner;
     private final List<UserInfo> committers;
     private final String comment;
     private final String triggeredBy;
@@ -30,7 +29,6 @@ class BuildInfo {
     BuildInfo(SBuild build) {
         this.buildId = build.getBuildId();
         this.clientDate = build.getClientStartDate();
-//        this.owner = Objects.requireNonNullElse(Objects.requireNonNull(build.getOwner()).getExtendedName(), "DEFAULT_OWNER");
         this.committers = build.getCommitters(SelectPrevBuildPolicy.SINCE_LAST_BUILD).getUsers()
                 .stream().map(UserInfo::new).collect(Collectors.toList());
 
@@ -39,9 +37,7 @@ class BuildInfo {
                 .collect(Collectors.toList());
 
         this.comment = build.getBuildComment() == null ? null : build.getBuildComment().getComment();
-        this.tests = build.getFullStatistics().getAllTests().stream()
-                .map(TestInfo::new)
-                .collect(Collectors.toList());
+
         this.triggeredBy = build.getTriggeredBy().getAsString();
         this.reasons = build.getFailureReasons().stream().map(FailureReasonInfo::new).collect(Collectors.toList());
         this.description = build.getBuildDescription();
@@ -50,8 +46,8 @@ class BuildInfo {
         this.branchName = build.getBranch() == null ? null : build.getBranch().getName();
     }
 
-    void setPreviousResponsible(HashMap<Long, String> previousResponsible) {
-        this.previousResponsible = previousResponsible;
+    public void setTests(List<TestInfo> tests) {
+        this.tests = tests;
     }
 }
 

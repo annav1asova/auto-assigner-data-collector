@@ -3,6 +3,8 @@ package com.teamcity.autoAssignerDataCollector;
 import jetbrains.buildServer.serverSide.SBuild;
 import jetbrains.buildServer.serverSide.STestRun;
 
+import java.util.HashMap;
+
 class TestInfo {
     private final String stacktrace;
     private String className;
@@ -12,6 +14,7 @@ class TestInfo {
     private int duration;
     private int orderId;
     private boolean isFixed;
+    private HashMap<Long, String> previousResponsible;
 
     TestInfo(STestRun testRun) {
         this.className = testRun.getTest().getClass().getCanonicalName();
@@ -22,5 +25,9 @@ class TestInfo {
         this.orderId = testRun.getOrderId();
         this.isFixed = testRun.isFixed();
         this.stacktrace = testRun.getFullText();
+    }
+
+    public void setPreviousResponsible(HashMap<Long, String> previousResponsible) {
+        this.previousResponsible = previousResponsible;
     }
 }

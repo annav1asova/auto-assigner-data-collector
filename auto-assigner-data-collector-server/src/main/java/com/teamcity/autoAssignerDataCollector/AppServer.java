@@ -24,6 +24,7 @@ import java.io.IOException;
 import java.io.OutputStreamWriter;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
+import java.util.stream.Collectors;
 
 public class AppServer extends BaseController {
     private final SBuildServer server;
@@ -56,16 +57,22 @@ public class AppServer extends BaseController {
         }
 
         @Nullable SProject project = getProjectByExternalId(request.getParameter("projectExternalId"));
+        if (project == null) {
+            throw new NotFoundException("Project with specified externalProjectId not found");
+        }
 
-//        HashMap<Integer, String> responsibilities = new HashMap<>();
         List<BuildInfo> builds = new ArrayList<>();
         server.getHistory().getEntries(true).forEach(sFinishedBuild -> {
-            if (sFinishedBuild.getProjectId().equals(project.getProjectId())) {
+            if (Objects.requireNonNull(sFinishedBuild.getProjectId()).equals(project.getProjectId())) {
                 BuildInfo buildInfo = new BuildInfo(sFinishedBuild);
 
-                HashMap<Long, String> previousResponsible = new HashMap<>(findInAudit(sFinishedBuild.getFullStatistics().getAllTests(),
-                        getProjectByExternalId(sFinishedBuild.getProjectExternalId())));
-                buildInfo.setPreviousResponsible(previousResponsible);
+                List<TestInfo> tests = new ArrayList<>();
+                sFinishedBuild.getFullStatistics().getAllTests().forEach(testRun -> {
+                    TestInfo testInfo = new TestInfo(testRun);
+                    testInfo.setPreviousResponsible(findInAudit(testRun, project));
+                    tests.add(testInfo);
+                });
+                buildInfo.setTests(tests);
                 builds.add(buildInfo);
             }
         });
@@ -75,13 +82,12 @@ public class AppServer extends BaseController {
     }
 
     @NotNull
-    public HashMap<Long, String> findInAudit(@NotNull final Iterable<STestRun> sTestRuns, @NotNull SProject project) {
+    public HashMap<Long, String> findInAudit(@NotNull final STestRun testRun, @NotNull SProject project) {
         AuditLogBuilder builder = auditLogProvider.getBuilder();
         builder.setActionTypes(ActionType.TEST_MARK_AS_FIXED, ActionType.TEST_INVESTIGATION_ASSIGN);
         Set<String> objectIds = new HashSet<>();
-        for (STestRun testRun : sTestRuns) {
-            objectIds.add(TestId.createOn(testRun.getTest().getTestNameId(), project.getProjectId()).asString());
-        }
+        objectIds.add(TestId.createOn(testRun.getTest().getTestNameId(), project.getProjectId()).asString());
+
         builder.setObjectIds(objectIds);
         List<AuditLogAction> lastActions = builder.getLogActions(-1);
         HashMap<Long, String> result = new HashMap<>();
