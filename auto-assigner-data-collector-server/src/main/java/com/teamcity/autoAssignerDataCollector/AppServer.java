@@ -82,7 +82,7 @@ public class AppServer extends BaseController {
     }
 
     @NotNull
-    public HashMap<Long, String> findInAudit(@NotNull final STestRun testRun, @NotNull SProject project) {
+    public List<String> findInAudit(@NotNull final STestRun testRun, @NotNull SProject project) {
         AuditLogBuilder builder = auditLogProvider.getBuilder();
         builder.setActionTypes(ActionType.TEST_MARK_AS_FIXED, ActionType.TEST_INVESTIGATION_ASSIGN);
         Set<String> objectIds = new HashSet<>();
@@ -90,7 +90,7 @@ public class AppServer extends BaseController {
 
         builder.setObjectIds(objectIds);
         List<AuditLogAction> lastActions = builder.getLogActions(-1);
-        HashMap<Long, String> result = new HashMap<>();
+        List<String> result = new ArrayList<>();
         for (AuditLogAction action : lastActions) {
             for (ObjectWrapper obj : action.getObjects()) {
                 Object user = obj.getObject();
@@ -100,7 +100,7 @@ public class AppServer extends BaseController {
 
                 TestId testId = TestId.fromString(action.getObjectId());
                 if (testId != null) {
-                    result.putIfAbsent(testId.getTestNameId(), ((User) user).getExtendedName());
+                    result.add(((User) user).getExtendedName());
                 }
             }
         }

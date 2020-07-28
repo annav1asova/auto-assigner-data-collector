@@ -4,6 +4,7 @@ import jetbrains.buildServer.serverSide.SBuild;
 import jetbrains.buildServer.serverSide.STestRun;
 
 import java.util.HashMap;
+import java.util.List;
 
 class TestInfo {
     private final String stacktrace;
@@ -14,7 +15,7 @@ class TestInfo {
     private int duration;
     private int orderId;
     private boolean isFixed;
-    private HashMap<Long, String> previousResponsible;
+    private List<String> previousResponsible;
 
     TestInfo(STestRun testRun) {
         this.className = testRun.getTest().getClass().getCanonicalName();
@@ -27,7 +28,7 @@ class TestInfo {
         this.stacktrace = testRun.getFullText();
     }
 
-    public void setPreviousResponsible(HashMap<Long, String> previousResponsible) {
+    public void setPreviousResponsible(List<String> previousResponsible) {
         this.previousResponsible = previousResponsible;
     }
 }
