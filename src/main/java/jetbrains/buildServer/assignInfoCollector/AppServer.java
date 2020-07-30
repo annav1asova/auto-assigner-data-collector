@@ -1,4 +1,4 @@
-package com.teamcity.autoAssignerDataCollector;
+package jetbrains.buildServer.assignInfoCollector;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
@@ -14,7 +14,8 @@ import jetbrains.buildServer.serverSide.auth.SecurityContext;
 import jetbrains.buildServer.serverSide.impl.audit.filters.TestId;
 import jetbrains.buildServer.users.User;
 import jetbrains.buildServer.web.openapi.WebControllerManager;
-import org.jetbrains.annotations.*;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.servlet.ModelAndView;
 
@@ -24,12 +25,9 @@ import java.io.IOException;
 import java.io.OutputStreamWriter;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
-import java.util.stream.Collectors;
 
 public class AppServer extends BaseController {
     private final SBuildServer server;
-    private final WebControllerManager manager;
-    private final SecurityContext securityContext;
     private final ProjectManager projectManager;
     private final AuditLogProvider auditLogProvider;
 
@@ -42,8 +40,6 @@ public class AppServer extends BaseController {
                      @NotNull final AuditLogProvider auditLogProvider) {
         super(server);
         this.server = server;
-        this.manager = manager;
-        this.securityContext = securityContext;
         this.projectManager = projectManager;
         this.auditLogProvider = auditLogProvider;
         manager.registerController("/demoPlugin.html", this);

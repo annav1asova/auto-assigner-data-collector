@@ -1,6 +1,5 @@
-package com.teamcity.autoAssignerDataCollector;
+package jetbrains.buildServer.assignInfoCollector;
 
-import jetbrains.buildServer.vcs.Modification;
 import jetbrains.buildServer.vcs.SVcsModification;
 import jetbrains.buildServer.vcs.VcsChangeInfo;
 

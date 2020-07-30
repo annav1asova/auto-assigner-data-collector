@@ -1,0 +1,71 @@
+plugins {
+  id 'com.github.rodm.teamcity-server' version '1.1.1'
+}
+
+apply plugin: 'java'
+apply plugin: 'com.github.rodm.teamcity-server'
+apply plugin: 'idea'
+
+ext {
+  teamcityVersion = project.hasProperty('teamcityVersion') ? property('teamcityVersion') : '2019.2'
+  versionNumber = project.hasProperty('versionNumber') ? property('versionNumber') : 'SNAPSHOT-' + new Date().format('yyyyMMddHHmmss')
+}
+
+group = 'jetbrains.buildServer.assignInfoCollector'
+
+version = versionNumber
+
+// Remove repositories added by plugins
+project.plugins.withType(JavaPlugin) {
+  project.repositories.clear()
+}
+
+repositories {
+  maven { url "https://download.jetbrains.com/teamcity-repository" }
+  mavenCentral()
+}
+
+dependencies {
+  provided(group: 'org.jetbrains.teamcity.internal', name: 'server', version: "${teamcityVersion}")
+  provided(group: 'org.jetbrains.teamcity', name: 'server-api', version: "${teamcityVersion}")
+  provided(group: 'org.jetbrains.teamcity', name: 'server-web-api', version: "${teamcityVersion}")
+  testCompile(group: 'org.jetbrains.teamcity', name: 'tests-support', version: "${teamcityVersion}")
+}
+
+sourceCompatibility = "1.8"
+targetCompatibility = "1.8"
+
+test {
+  useTestNG()
+}
+
+teamcity {
+  version = teamcityVersion
+
+  server {
+    descriptor {
+      name = project.name
+      displayName = 'Assign Info Collector'
+      version = project.version
+      vendorName = 'JetBrains, s.r.o.'
+      vendorUrl = 'http://www.jetbrains.com/'
+      description = 'investigations info collector'
+
+      useSeparateClassloader = true
+    }
+  }
+}
+
+// Do not include version into plugin archive name
+serverPlugin.version = null
+
+idea {
+  module {
+    downloadJavadoc = false
+    downloadSources = true
+  }
+}
+
+task wrapper(type: Wrapper) {
+  gradleVersion = '4.6'
+}

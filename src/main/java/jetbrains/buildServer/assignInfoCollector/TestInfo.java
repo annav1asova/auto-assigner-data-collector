@@ -1,9 +1,7 @@
-package com.teamcity.autoAssignerDataCollector;
+package jetbrains.buildServer.assignInfoCollector;
 
-import jetbrains.buildServer.serverSide.SBuild;
 import jetbrains.buildServer.serverSide.STestRun;
 
-import java.util.HashMap;
 import java.util.List;
 
 class TestInfo {
