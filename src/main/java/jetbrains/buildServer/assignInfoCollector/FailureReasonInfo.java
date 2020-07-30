@@ -1,4 +1,4 @@
-package com.teamcity.autoAssignerDataCollector;
+package jetbrains.buildServer.assignInfoCollector;
 
 import jetbrains.buildServer.BuildProblemData;
 

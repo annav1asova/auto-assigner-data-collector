@@ -1,15 +1,12 @@
-package com.teamcity.autoAssignerDataCollector;
+package jetbrains.buildServer.assignInfoCollector;
 
-import jetbrains.buildServer.BuildProblemData;
 import jetbrains.buildServer.serverSide.SBuild;
-import jetbrains.buildServer.users.SUser;
-import jetbrains.buildServer.users.User;
-import jetbrains.buildServer.vcs.Modification;
 import jetbrains.buildServer.vcs.SelectPrevBuildPolicy;
 
-import java.util.*;
+import java.util.Date;
+import java.util.HashMap;
+import java.util.List;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 class BuildInfo {
     private final long buildId;
