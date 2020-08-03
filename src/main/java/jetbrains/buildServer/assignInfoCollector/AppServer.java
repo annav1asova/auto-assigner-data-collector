@@ -25,6 +25,7 @@ import java.io.IOException;
 import java.io.OutputStreamWriter;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
+import java.util.stream.Collectors;
 
 public class AppServer extends BaseController {
     private final SBuildServer server;
@@ -42,7 +43,7 @@ public class AppServer extends BaseController {
         this.server = server;
         this.projectManager = projectManager;
         this.auditLogProvider = auditLogProvider;
-        manager.registerController("/demoPlugin.html", this);
+        manager.registerController("/assignInfoCollector.html", this);
     }
 
     @Nullable
@@ -58,14 +59,15 @@ public class AppServer extends BaseController {
         }
 
         List<BuildInfo> builds = new ArrayList<>();
-        server.getHistory().getEntries(true).forEach(sFinishedBuild -> {
+        List<TestInfo> allTestRuns = new ArrayList<>();
+
+        server.getHistory().getEntries(false).forEach(sFinishedBuild -> {
             if (Objects.requireNonNull(sFinishedBuild.getProjectId()).equals(project.getProjectId())) {
                 BuildInfo buildInfo = new BuildInfo(sFinishedBuild);
-
                 List<TestInfo> tests = new ArrayList<>();
                 sFinishedBuild.getFullStatistics().getAllTests().forEach(testRun -> {
                     TestInfo testInfo = new TestInfo(testRun);
-                    testInfo.setPreviousResponsible(findInAudit(testRun, project));
+                    allTestRuns.add(testInfo);
                     tests.add(testInfo);
                 });
                 buildInfo.setTests(tests);
@@ -73,20 +75,31 @@ public class AppServer extends BaseController {
             }
         });
 
+        Map<Long, List<String>> auditResult = findInAudit(allTestRuns.stream()
+                        .map(TestInfo::getTestNameId)
+                        .collect(Collectors.toList()),
+                project);
+
+        allTestRuns.forEach(testRun -> {
+            testRun.setPreviousResponsible(auditResult.get(testRun.getTestNameId()));
+        });
+
         sendResponse(response, builds);
         return null;
     }
 
     @NotNull
-    public List<String> findInAudit(@NotNull final STestRun testRun, @NotNull SProject project) {
+    public Map<Long, List<String>> findInAudit(@NotNull final List<Long> testNameIds, @NotNull SProject project) {
         AuditLogBuilder builder = auditLogProvider.getBuilder();
         builder.setActionTypes(ActionType.TEST_MARK_AS_FIXED, ActionType.TEST_INVESTIGATION_ASSIGN);
         Set<String> objectIds = new HashSet<>();
-        objectIds.add(TestId.createOn(testRun.getTest().getTestNameId(), project.getProjectId()).asString());
+        testNameIds.forEach(testNameId -> {
+            objectIds.add(TestId.createOn(testNameId, project.getProjectId()).asString());
+        });
 
         builder.setObjectIds(objectIds);
         List<AuditLogAction> lastActions = builder.getLogActions(-1);
-        List<String> result = new ArrayList<>();
+        Map<Long, List<String>> result = new HashMap<>();
         for (AuditLogAction action : lastActions) {
             for (ObjectWrapper obj : action.getObjects()) {
                 Object user = obj.getObject();
@@ -96,7 +109,8 @@ public class AppServer extends BaseController {
 
                 TestId testId = TestId.fromString(action.getObjectId());
                 if (testId != null) {
-                    result.add(((User) user).getExtendedName());
+                    result.putIfAbsent(testId.getTestNameId(), new ArrayList<>());
+                    result.get(testId.getTestNameId()).add(((User) user).getExtendedName());
                 }
             }
         }

@@ -20,7 +20,6 @@ class BuildInfo {
     private final List<ChangeInfo> committersUsers;
     private final List<FailureReasonInfo> reasons;
     private List<TestInfo> tests;
-    private HashMap<Long, String> previousResponsible;
 
 
     BuildInfo(SBuild build) {
