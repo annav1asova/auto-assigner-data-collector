@@ -7,7 +7,6 @@ import jetbrains.buildServer.issueTracker.errors.NotFoundException;
 import jetbrains.buildServer.serverSide.ProjectManager;
 import jetbrains.buildServer.serverSide.SBuildServer;
 import jetbrains.buildServer.serverSide.SProject;
-import jetbrains.buildServer.serverSide.STestRun;
 import jetbrains.buildServer.serverSide.audit.*;
 import jetbrains.buildServer.serverSide.auth.AccessDeniedException;
 import jetbrains.buildServer.serverSide.auth.SecurityContext;
@@ -27,22 +26,19 @@ import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.stream.Collectors;
 
-public class AppServer extends BaseController {
+public class BuildIdsController extends BaseController {
     private final SBuildServer server;
     private final ProjectManager projectManager;
-    private final AuditLogProvider auditLogProvider;
 
     private final Gson myGson = new GsonBuilder().setPrettyPrinting().create();
 
-    public AppServer(@NotNull final SBuildServer server,
+    public BuildIdsController(@NotNull final SBuildServer server,
                      @NotNull final WebControllerManager manager,
-                     @NotNull final ProjectManager projectManager,
-                     @NotNull final AuditLogProvider auditLogProvider) {
+                     @NotNull final ProjectManager projectManager) {
         super(server);
         this.server = server;
         this.projectManager = projectManager;
-        this.auditLogProvider = auditLogProvider;
-        manager.registerController("/assignInfoCollector.html", this);
+        manager.registerController("/assignInfoCollectorIds.html", this);
     }
 
     @Nullable
@@ -51,72 +47,21 @@ public class AppServer extends BaseController {
         if (!isGet(request)) {
             throw new HttpRequestMethodNotSupportedException(request.getMethod());
         }
-
         @Nullable SProject project = getProjectByExternalId(request.getParameter("projectExternalId"));
         if (project == null) {
             throw new NotFoundException("Project with specified externalProjectId not found");
         }
 
-        List<Long> ids = Arrays.stream(request.getParameter("ids").split(","))
-        .map(Long::parseLong).collect(Collectors.toList());
+        List<Long> buildIds = new ArrayList<>();
 
-        List<BuildInfo> builds = new ArrayList<>();
-        List<TestInfo> allTestRuns = new ArrayList<>();
-
-        server.getHistory().findEntries(ids).forEach(sFinishedBuild -> {
+        server.getHistory().getEntries(false).forEach(sFinishedBuild -> {
             if (Objects.requireNonNull(sFinishedBuild.getProjectId()).equals(project.getProjectId())) {
-                BuildInfo buildInfo = new BuildInfo(sFinishedBuild);
-                List<TestInfo> tests = new ArrayList<>();
-                sFinishedBuild.getFullStatistics().getAllTests().forEach(testRun -> {
-                    TestInfo testInfo = new TestInfo(testRun);
-                    allTestRuns.add(testInfo);
-                    tests.add(testInfo);
-                });
-                buildInfo.setTests(tests);
-                builds.add(buildInfo);
+                buildIds.add(sFinishedBuild.getBuildId());
             }
         });
 
-        Map<Long, List<String>> auditResult = findInAudit(allTestRuns.stream()
-                        .map(TestInfo::getTestNameId)
-                        .collect(Collectors.toList()),
-                project);
-
-        allTestRuns.forEach(testRun -> {
-            testRun.setPreviousResponsible(auditResult.get(testRun.getTestNameId()));
-        });
-
-        sendResponse(response, builds);
+        sendResponse(response, buildIds);
         return null;
-    }
-
-    @NotNull
-    public Map<Long, List<String>> findInAudit(@NotNull final List<Long> testNameIds, @NotNull SProject project) {
-        AuditLogBuilder builder = auditLogProvider.getBuilder();
-        builder.setActionTypes(ActionType.TEST_MARK_AS_FIXED, ActionType.TEST_INVESTIGATION_ASSIGN);
-        Set<String> objectIds = new HashSet<>();
-        testNameIds.forEach(testNameId -> {
-            objectIds.add(TestId.createOn(testNameId, project.getProjectId()).asString());
-        });
-
-        builder.setObjectIds(objectIds);
-        List<AuditLogAction> lastActions = builder.getLogActions(-1);
-        Map<Long, List<String>> result = new HashMap<>();
-        for (AuditLogAction action : lastActions) {
-            for (ObjectWrapper obj : action.getObjects()) {
-                Object user = obj.getObject();
-                if (!(user instanceof User)) {
-                    continue;
-                }
-
-                TestId testId = TestId.fromString(action.getObjectId());
-                if (testId != null) {
-                    result.putIfAbsent(testId.getTestNameId(), new ArrayList<>());
-                    result.get(testId.getTestNameId()).add(((User) user).getExtendedName());
-                }
-            }
-        }
-        return result;
     }
 
     @Nullable
@@ -134,10 +79,11 @@ public class AppServer extends BaseController {
     }
 
     private void sendResponse(@NotNull HttpServletResponse servletResponse,
-                              @NotNull List<BuildInfo> responsibilities) throws IOException {
+                              @NotNull List<Long> responsibilities) throws IOException {
         try (OutputStreamWriter writer = new OutputStreamWriter(servletResponse.getOutputStream(), StandardCharsets.UTF_8)) {
             servletResponse.setContentType("application/json");
             writer.write(myGson.toJson(responsibilities));
         }
     }
 }
+
