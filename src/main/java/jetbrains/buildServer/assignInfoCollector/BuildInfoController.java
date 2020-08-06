@@ -79,7 +79,7 @@ public class BuildInfoController extends BaseController {
 
         Map<Long, List<String>> auditResult = findInAudit(allTestRuns.stream()
                         .map(TestInfo::getTestNameId)
-                        .collect(Collectors.toList()),
+                        .collect(Collectors.toSet()),
                 project);
 
         allTestRuns.forEach(testRun -> {
@@ -91,7 +91,7 @@ public class BuildInfoController extends BaseController {
     }
 
     @NotNull
-    public Map<Long, List<String>> findInAudit(@NotNull final List<Long> testNameIds, @NotNull SProject project) {
+    public Map<Long, List<String>> findInAudit(@NotNull final Set<Long> testNameIds, @NotNull SProject project) {
         AuditLogBuilder builder = auditLogProvider.getBuilder();
         builder.setActionTypes(ActionType.TEST_MARK_AS_FIXED, ActionType.TEST_INVESTIGATION_ASSIGN);
         Set<String> objectIds = new HashSet<>();

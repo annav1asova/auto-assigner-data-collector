@@ -18,11 +18,5 @@ class ChangeInfo {
         this.description = modification.getDescription();
         this.vcsDate = modification.getVcsDate();
         this.userName = modification.getUserName();
-
-//        modification.getChanges().stream().forEach(change -> {
-//                change.
-//        });
-
-//        this.vcsRoot = modification.getVcsRoot();
     }
 }
