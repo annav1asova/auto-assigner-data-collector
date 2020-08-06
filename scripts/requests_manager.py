@@ -6,12 +6,14 @@ import argparse
 
 
 def load_build_ids(host, project_id, token):
-    response = requests.get(f'{host}/assignInfoCollectorIds.html',
-                            params={'projectExternalId': project_id},
-                            headers={'Authorization': token})
+    response = requests.get(f'{host}/app/rest/builds/?locator=project:{project_id}',
+                            headers={'Authorization': token, 'Accept': 'application/json'})
+
+    response_json = json.loads(response.text)
+    build_ids = str(list(map(lambda t: t['id'], response_json['build'])))
     dirname = os.path.dirname(__file__)
     file_ids = open(os.path.join(dirname, 'build_ids.json'), 'w')
-    file_ids.write(response.text)
+    file_ids.write(build_ids)
     file_ids.close()
 
 

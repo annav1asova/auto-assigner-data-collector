@@ -27,17 +27,17 @@ import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.stream.Collectors;
 
-public class AppServer extends BaseController {
+public class BuildInfoController extends BaseController {
     private final SBuildServer server;
     private final ProjectManager projectManager;
     private final AuditLogProvider auditLogProvider;
 
     private final Gson myGson = new GsonBuilder().setPrettyPrinting().create();
 
-    public AppServer(@NotNull final SBuildServer server,
-                     @NotNull final WebControllerManager manager,
-                     @NotNull final ProjectManager projectManager,
-                     @NotNull final AuditLogProvider auditLogProvider) {
+    public BuildInfoController(@NotNull final SBuildServer server,
+                               @NotNull final WebControllerManager manager,
+                               @NotNull final ProjectManager projectManager,
+                               @NotNull final AuditLogProvider auditLogProvider) {
         super(server);
         this.server = server;
         this.projectManager = projectManager;
