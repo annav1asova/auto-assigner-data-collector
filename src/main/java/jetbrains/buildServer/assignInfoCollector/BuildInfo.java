@@ -23,7 +23,7 @@ class BuildInfo {
     private final int testCount;
 
 
-    BuildInfo(SBuild build, int changeLimit, int filesChangedLimit) {
+    BuildInfo(SBuild build) {
         this.buildId = build.getBuildId();
         this.clientDate = build.getClientStartDate();
         this.committers = build.getCommitters(SelectPrevBuildPolicy.SINCE_LAST_BUILD).getUsers()
@@ -31,8 +31,8 @@ class BuildInfo {
 
         this.changeCount = build.getChanges(SelectPrevBuildPolicy.SINCE_LAST_BUILD, true).size();
         this.committersUsers = build.getChanges(SelectPrevBuildPolicy.SINCE_LAST_BUILD, true).stream()
-                .limit(changeLimit)
-                .map(modification -> new ChangeInfo(modification, filesChangedLimit))
+                .limit(Limits.CHANGE_LIMIT)
+                .map(ChangeInfo::new)
                 .collect(Collectors.toList());
 
         this.comment = build.getBuildComment() == null ? null : build.getBuildComment().getComment();

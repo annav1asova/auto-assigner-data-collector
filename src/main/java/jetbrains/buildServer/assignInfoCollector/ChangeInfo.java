@@ -14,10 +14,10 @@ class ChangeInfo {
     private final Date vcsDate;
     private final String userName;
 
-    public ChangeInfo (SVcsModification modification, int filesChangedLimit) {
+    public ChangeInfo (SVcsModification modification) {
         this.filesChange = modification.getChangeCount();
         this.changesNames = modification.getChanges().stream()
-                .limit(filesChangedLimit)
+                .limit(Limits.FILES_CHANGED_LIMIT)
                 .map(VcsChangeInfo::getFileName)
                 .collect(Collectors.toList());
         this.description = modification.getDescription();

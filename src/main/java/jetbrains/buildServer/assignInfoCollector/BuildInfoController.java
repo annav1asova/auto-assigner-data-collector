@@ -4,13 +4,13 @@ import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import jetbrains.buildServer.controllers.BaseController;
 import jetbrains.buildServer.issueTracker.errors.NotFoundException;
+import jetbrains.buildServer.responsibility.TestNameResponsibilityEntry;
+import jetbrains.buildServer.responsibility.TestNameResponsibilityFacade;
 import jetbrains.buildServer.serverSide.ProjectManager;
 import jetbrains.buildServer.serverSide.SBuildServer;
 import jetbrains.buildServer.serverSide.SProject;
-import jetbrains.buildServer.serverSide.STestRun;
 import jetbrains.buildServer.serverSide.audit.*;
 import jetbrains.buildServer.serverSide.auth.AccessDeniedException;
-import jetbrains.buildServer.serverSide.auth.SecurityContext;
 import jetbrains.buildServer.serverSide.impl.audit.filters.TestId;
 import jetbrains.buildServer.users.User;
 import jetbrains.buildServer.web.openapi.WebControllerManager;
@@ -31,10 +31,6 @@ public class BuildInfoController extends BaseController {
     private final SBuildServer server;
     private final ProjectManager projectManager;
     private final AuditLogProvider auditLogProvider;
-
-    private final static int TEST_LIMIT = 1000;
-    private final static int CHANGE_LIMIT = 100;
-    private final static int FILES_CHANGED_LIMIT = 100;
 
     private final Gson myGson = new GsonBuilder().setPrettyPrinting().create();
 
@@ -69,13 +65,16 @@ public class BuildInfoController extends BaseController {
 
         server.getHistory().findEntries(ids).forEach(sFinishedBuild -> {
             if (Objects.requireNonNull(sFinishedBuild.getProjectId()).equals(project.getProjectId())) {
-                BuildInfo buildInfo = new BuildInfo(sFinishedBuild, CHANGE_LIMIT, FILES_CHANGED_LIMIT);
+                BuildInfo buildInfo = new BuildInfo(sFinishedBuild);
                 List<TestInfo> tests = new ArrayList<>();
-                sFinishedBuild.getFullStatistics().getAllTests().stream().limit(TEST_LIMIT).forEach(testRun -> {
-                    TestInfo testInfo = new TestInfo(testRun);
-                    allTestRuns.add(testInfo);
-                    tests.add(testInfo);
-                });
+                sFinishedBuild.getFullStatistics().getAllTests().stream()
+                        .filter(testRun -> !testRun.getTest().getAllResponsibilities().isEmpty())
+                        .limit(Limits.TEST_LIMIT)
+                        .forEach(testRun -> {
+                            TestInfo testInfo = new TestInfo(testRun);
+                            allTestRuns.add(testInfo);
+                            tests.add(testInfo);
+                        });
                 buildInfo.setTests(tests);
                 builds.add(buildInfo);
             }
@@ -89,8 +88,6 @@ public class BuildInfoController extends BaseController {
         allTestRuns.forEach(testRun -> {
             testRun.setPreviousResponsible(auditResult.get(testRun.getTestNameId()));
         });
-
-        builds.forEach(BuildInfo::filterTests);
 
         sendResponse(response, builds);
         return null;
