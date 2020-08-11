@@ -51,7 +51,7 @@ class BuildInfo {
     }
 
     public void filterTests() {
-        this.tests.removeIf(testInfo -> testInfo.getPreviousResponsible().isEmpty());
+        this.tests.removeIf(testInfo -> testInfo.getPreviousResponsible() == null);
     }
 }
 
