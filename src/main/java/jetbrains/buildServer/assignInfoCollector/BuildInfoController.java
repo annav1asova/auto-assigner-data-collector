@@ -32,6 +32,10 @@ public class BuildInfoController extends BaseController {
     private final ProjectManager projectManager;
     private final AuditLogProvider auditLogProvider;
 
+    private final static int TEST_LIMIT = 1000;
+    private final static int CHANGE_LIMIT = 100;
+    private final static int FILES_CHANGED_LIMIT = 100;
+
     private final Gson myGson = new GsonBuilder().setPrettyPrinting().create();
 
     public BuildInfoController(@NotNull final SBuildServer server,
@@ -58,16 +62,16 @@ public class BuildInfoController extends BaseController {
         }
 
         List<Long> ids = Arrays.stream(request.getParameter("ids").split(","))
-        .map(Long::parseLong).collect(Collectors.toList());
+                .map(Long::parseLong).collect(Collectors.toList());
 
         List<BuildInfo> builds = new ArrayList<>();
         List<TestInfo> allTestRuns = new ArrayList<>();
 
         server.getHistory().findEntries(ids).forEach(sFinishedBuild -> {
             if (Objects.requireNonNull(sFinishedBuild.getProjectId()).equals(project.getProjectId())) {
-                BuildInfo buildInfo = new BuildInfo(sFinishedBuild);
+                BuildInfo buildInfo = new BuildInfo(sFinishedBuild, CHANGE_LIMIT, FILES_CHANGED_LIMIT);
                 List<TestInfo> tests = new ArrayList<>();
-                sFinishedBuild.getFullStatistics().getAllTests().forEach(testRun -> {
+                sFinishedBuild.getFullStatistics().getAllTests().stream().limit(TEST_LIMIT).forEach(testRun -> {
                     TestInfo testInfo = new TestInfo(testRun);
                     allTestRuns.add(testInfo);
                     tests.add(testInfo);
@@ -85,6 +89,8 @@ public class BuildInfoController extends BaseController {
         allTestRuns.forEach(testRun -> {
             testRun.setPreviousResponsible(auditResult.get(testRun.getTestNameId()));
         });
+
+        builds.forEach(BuildInfo::filterTests);
 
         sendResponse(response, builds);
         return null;
