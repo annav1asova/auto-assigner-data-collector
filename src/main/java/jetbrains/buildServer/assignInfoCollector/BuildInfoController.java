@@ -61,7 +61,7 @@ public class BuildInfoController extends BaseController {
                 .map(Long::parseLong).collect(Collectors.toList());
 
         List<BuildInfo> builds = new ArrayList<>();
-        List<TestInfo> allTestRuns = new ArrayList<>();
+        List<TestInfo> testRunsWithResponsibilities = new ArrayList<>();
 
         server.getHistory().findEntries(ids).forEach(sFinishedBuild -> {
             if (Objects.requireNonNull(sFinishedBuild.getProjectId()).equals(project.getProjectId())) {
@@ -72,7 +72,7 @@ public class BuildInfoController extends BaseController {
                         .limit(Limits.TEST_LIMIT)
                         .forEach(testRun -> {
                             TestInfo testInfo = new TestInfo(testRun);
-                            allTestRuns.add(testInfo);
+                            testRunsWithResponsibilities.add(testInfo);
                             tests.add(testInfo);
                         });
                 buildInfo.setTests(tests);
@@ -80,12 +80,12 @@ public class BuildInfoController extends BaseController {
             }
         });
 
-        Map<Long, List<String>> auditResult = findInAudit(allTestRuns.stream()
+        Map<Long, List<String>> auditResult = findInAudit(testRunsWithResponsibilities.stream()
                         .map(TestInfo::getTestNameId)
                         .collect(Collectors.toSet()),
                 project);
 
-        allTestRuns.forEach(testRun -> {
+        testRunsWithResponsibilities.forEach(testRun -> {
             testRun.setPreviousResponsible(auditResult.get(testRun.getTestNameId()));
         });
 
