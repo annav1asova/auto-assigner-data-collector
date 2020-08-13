@@ -34,6 +34,10 @@ class TestInfo {
         this.previousResponsible = previousResponsible;
     }
 
+    public List<String> getPreviousResponsible() {
+        return this.previousResponsible;
+    }
+
     public long getTestNameId() {
         return testNameId;
     }

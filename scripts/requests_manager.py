@@ -5,17 +5,19 @@ import logging
 import argparse
 
 
-def load_build_ids(host, project_id, token):
-    response = requests.get(f'{host}/assignInfoCollectorIds.html',
-                            params={'projectExternalId': project_id},
-                            headers={'Authorization': token})
+def load_build_ids(host, project_id, token, timeout=10800):
+    response = requests.get(f'{host}/app/rest/builds/?locator=project:{project_id}',
+                            headers={'Authorization': token, 'Accept': 'application/json'}, timeout=timeout)
+
+    response_json = json.loads(response.text)
+    build_ids = str(list(map(lambda t: t['id'], response_json['build'])))
     dirname = os.path.dirname(__file__)
     file_ids = open(os.path.join(dirname, 'build_ids.json'), 'w')
-    file_ids.write(response.text)
+    file_ids.write(build_ids)
     file_ids.close()
 
 
-def load_builds_info(host, project_id, token, start_from=0, batch_size=3):
+def load_builds_info(host, project_id, token, start_from=0, batch_size=3, timeout=10800):
     dirname = os.path.dirname(__file__)
     file_ids = open(os.path.join(dirname, 'build_ids.json'), 'r')
     build_ids = json.loads(file_ids.read())
@@ -26,7 +28,7 @@ def load_builds_info(host, project_id, token, start_from=0, batch_size=3):
 
         response = requests.get(f'{host}/assignInfoCollector.html',
                                 params={'projectExternalId': project_id, 'ids': ','.join(map(str, batch))},
-                                headers={'Authorization': token})
+                                headers={'Authorization': token}, timeout=timeout)
 
         file_info = open(os.path.join(dirname, f'builds_info_{i}_{i + batch_size - 1}.json'), 'w')
         file_info.write(response.text)

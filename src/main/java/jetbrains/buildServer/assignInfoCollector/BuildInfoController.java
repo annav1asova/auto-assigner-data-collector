@@ -4,13 +4,13 @@ import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import jetbrains.buildServer.controllers.BaseController;
 import jetbrains.buildServer.issueTracker.errors.NotFoundException;
+import jetbrains.buildServer.responsibility.TestNameResponsibilityEntry;
+import jetbrains.buildServer.responsibility.TestNameResponsibilityFacade;
 import jetbrains.buildServer.serverSide.ProjectManager;
 import jetbrains.buildServer.serverSide.SBuildServer;
 import jetbrains.buildServer.serverSide.SProject;
-import jetbrains.buildServer.serverSide.STestRun;
 import jetbrains.buildServer.serverSide.audit.*;
 import jetbrains.buildServer.serverSide.auth.AccessDeniedException;
-import jetbrains.buildServer.serverSide.auth.SecurityContext;
 import jetbrains.buildServer.serverSide.impl.audit.filters.TestId;
 import jetbrains.buildServer.users.User;
 import jetbrains.buildServer.web.openapi.WebControllerManager;
@@ -27,17 +27,17 @@ import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.stream.Collectors;
 
-public class AppServer extends BaseController {
+public class BuildInfoController extends BaseController {
     private final SBuildServer server;
     private final ProjectManager projectManager;
     private final AuditLogProvider auditLogProvider;
 
     private final Gson myGson = new GsonBuilder().setPrettyPrinting().create();
 
-    public AppServer(@NotNull final SBuildServer server,
-                     @NotNull final WebControllerManager manager,
-                     @NotNull final ProjectManager projectManager,
-                     @NotNull final AuditLogProvider auditLogProvider) {
+    public BuildInfoController(@NotNull final SBuildServer server,
+                               @NotNull final WebControllerManager manager,
+                               @NotNull final ProjectManager projectManager,
+                               @NotNull final AuditLogProvider auditLogProvider) {
         super(server);
         this.server = server;
         this.projectManager = projectManager;
@@ -58,31 +58,36 @@ public class AppServer extends BaseController {
         }
 
         List<Long> ids = Arrays.stream(request.getParameter("ids").split(","))
-        .map(Long::parseLong).collect(Collectors.toList());
+                .map(Long::parseLong).collect(Collectors.toList());
 
         List<BuildInfo> builds = new ArrayList<>();
-        List<TestInfo> allTestRuns = new ArrayList<>();
+        List<TestInfo> testRunsWithResponsibilities = new ArrayList<>();
 
-        server.getHistory().findEntries(ids).forEach(sFinishedBuild -> {
-            if (Objects.requireNonNull(sFinishedBuild.getProjectId()).equals(project.getProjectId())) {
-                BuildInfo buildInfo = new BuildInfo(sFinishedBuild);
-                List<TestInfo> tests = new ArrayList<>();
-                sFinishedBuild.getFullStatistics().getAllTests().forEach(testRun -> {
-                    TestInfo testInfo = new TestInfo(testRun);
-                    allTestRuns.add(testInfo);
-                    tests.add(testInfo);
+        server.getHistory().findEntries(ids).stream()
+                .filter(build -> !build.isAgentLessBuild()) // filter composite builds
+                .forEach(finishedBuild -> {
+                    if (Objects.requireNonNull(finishedBuild.getProjectId()).equals(project.getProjectId())) {
+                        BuildInfo buildInfo = new BuildInfo(finishedBuild);
+                        List<TestInfo> tests = new ArrayList<>();
+                        finishedBuild.getFullStatistics().getAllTests().stream()
+                                .filter(testRun -> !testRun.getTest().getAllResponsibilities().isEmpty())
+                                .limit(Limits.TEST_LIMIT)
+                                .forEach(testRun -> {
+                                    TestInfo testInfo = new TestInfo(testRun);
+                                    testRunsWithResponsibilities.add(testInfo);
+                                    tests.add(testInfo);
+                                });
+                        buildInfo.setTests(tests);
+                        builds.add(buildInfo);
+                    }
                 });
-                buildInfo.setTests(tests);
-                builds.add(buildInfo);
-            }
-        });
 
-        Map<Long, List<String>> auditResult = findInAudit(allTestRuns.stream()
+        Map<Long, List<String>> auditResult = findInAudit(testRunsWithResponsibilities.stream()
                         .map(TestInfo::getTestNameId)
-                        .collect(Collectors.toList()),
+                        .collect(Collectors.toSet()),
                 project);
 
-        allTestRuns.forEach(testRun -> {
+        testRunsWithResponsibilities.forEach(testRun -> {
             testRun.setPreviousResponsible(auditResult.get(testRun.getTestNameId()));
         });
 
@@ -91,7 +96,7 @@ public class AppServer extends BaseController {
     }
 
     @NotNull
-    public Map<Long, List<String>> findInAudit(@NotNull final List<Long> testNameIds, @NotNull SProject project) {
+    public Map<Long, List<String>> findInAudit(@NotNull final Set<Long> testNameIds, @NotNull SProject project) {
         AuditLogBuilder builder = auditLogProvider.getBuilder();
         builder.setActionTypes(ActionType.TEST_MARK_AS_FIXED, ActionType.TEST_INVESTIGATION_ASSIGN);
         Set<String> objectIds = new HashSet<>();
