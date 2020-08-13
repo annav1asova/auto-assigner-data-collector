@@ -4,13 +4,13 @@ import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import jetbrains.buildServer.controllers.BaseController;
 import jetbrains.buildServer.issueTracker.errors.NotFoundException;
-import jetbrains.buildServer.responsibility.TestNameResponsibilityEntry;
-import jetbrains.buildServer.responsibility.TestNameResponsibilityFacade;
 import jetbrains.buildServer.serverSide.ProjectManager;
 import jetbrains.buildServer.serverSide.SBuildServer;
 import jetbrains.buildServer.serverSide.SProject;
 import jetbrains.buildServer.serverSide.audit.*;
 import jetbrains.buildServer.serverSide.auth.AccessDeniedException;
+import jetbrains.buildServer.serverSide.auth.Permission;
+import jetbrains.buildServer.serverSide.auth.SecurityContext;
 import jetbrains.buildServer.serverSide.impl.audit.filters.TestId;
 import jetbrains.buildServer.users.User;
 import jetbrains.buildServer.web.openapi.WebControllerManager;
@@ -31,17 +31,20 @@ public class BuildInfoController extends BaseController {
     private final SBuildServer server;
     private final ProjectManager projectManager;
     private final AuditLogProvider auditLogProvider;
+    private final SecurityContext mySecurityContext;
 
     private final Gson myGson = new GsonBuilder().setPrettyPrinting().create();
 
     public BuildInfoController(@NotNull final SBuildServer server,
                                @NotNull final WebControllerManager manager,
                                @NotNull final ProjectManager projectManager,
-                               @NotNull final AuditLogProvider auditLogProvider) {
+                               @NotNull final AuditLogProvider auditLogProvider,
+                               @NotNull final SecurityContext securityContext) {
         super(server);
         this.server = server;
         this.projectManager = projectManager;
         this.auditLogProvider = auditLogProvider;
+        mySecurityContext = securityContext;
         manager.registerController("/assignInfoCollector.html", this);
     }
 
@@ -55,10 +58,11 @@ public class BuildInfoController extends BaseController {
         @Nullable SProject project = getProjectByExternalId(request.getParameter("projectExternalId"));
         if (project == null) {
             throw new NotFoundException("Project with specified externalProjectId not found");
+        } else if (!mySecurityContext.getAuthorityHolder().getPermissionsGrantedForProject(project.getProjectId()).contains(Permission.EDIT_PROJECT)) {
+            throw new IllegalAccessException("User doesn't have enough permissions. " + Permission.VIEW_PROJECT.getName() + " permission required.");
         }
 
-        List<Long> ids = Arrays.stream(request.getParameter("ids").split(","))
-                .map(Long::parseLong).collect(Collectors.toList());
+        List<Long> ids = Arrays.stream(request.getParameter("ids").split(",")).map(Long::parseLong).collect(Collectors.toList());
 
         List<BuildInfo> builds = new ArrayList<>();
         List<TestInfo> testRunsWithResponsibilities = new ArrayList<>();
