@@ -70,20 +70,18 @@ public class BuildInfoController extends BaseController {
         server.getHistory().findEntries(ids).stream()
                 .filter(build -> !build.isAgentLessBuild()) // filter composite builds
                 .forEach(finishedBuild -> {
-                    if (Objects.requireNonNull(finishedBuild.getProjectId()).equals(project.getProjectId())) {
-                        BuildInfo buildInfo = new BuildInfo(finishedBuild);
-                        List<TestInfo> tests = new ArrayList<>();
-                        finishedBuild.getFullStatistics().getAllTests().stream()
-                                .filter(testRun -> !testRun.getTest().getAllResponsibilities().isEmpty())
-                                .limit(Limits.TEST_LIMIT)
-                                .forEach(testRun -> {
-                                    TestInfo testInfo = new TestInfo(testRun);
-                                    testRunsWithResponsibilities.add(testInfo);
-                                    tests.add(testInfo);
-                                });
-                        buildInfo.setTests(tests);
-                        builds.add(buildInfo);
-                    }
+                    BuildInfo buildInfo = new BuildInfo(finishedBuild);
+                    List<TestInfo> tests = new ArrayList<>();
+                    finishedBuild.getFullStatistics().getAllTests().stream()
+                            .filter(testRun -> !testRun.getTest().getAllResponsibilities().isEmpty())
+                            .limit(Limits.TEST_LIMIT)
+                            .forEach(testRun -> {
+                                TestInfo testInfo = new TestInfo(testRun);
+                                testRunsWithResponsibilities.add(testInfo);
+                                tests.add(testInfo);
+                            });
+                    buildInfo.setTests(tests);
+                    builds.add(buildInfo);
                 });
 
         Map<Long, List<String>> auditResult = findInAudit(testRunsWithResponsibilities.stream()

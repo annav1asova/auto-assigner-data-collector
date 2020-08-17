@@ -3,10 +3,11 @@ import json
 import os
 import logging
 import argparse
+import time
 
 
 def load_build_ids(host, project_id, token, timeout=10800):
-    response = requests.get(f'{host}/app/rest/builds/?locator=project:{project_id}',
+    response = requests.get(f'{host}/app/rest/builds/?locator=affectedProject:{project_id}',
                             headers={'Authorization': token, 'Accept': 'application/json'}, timeout=timeout)
 
     response_json = json.loads(response.text)
@@ -15,9 +16,10 @@ def load_build_ids(host, project_id, token, timeout=10800):
     file_ids = open(os.path.join(dirname, 'build_ids.json'), 'w')
     file_ids.write(build_ids)
     file_ids.close()
+    logging.info(f'Build ids received')
 
 
-def load_builds_info(host, project_id, token, start_from=0, batch_size=3, timeout=10800):
+def load_builds_info(host, project_id, token, start_from=0, batch_size=5, timeout=10800):
     dirname = os.path.dirname(__file__)
     file_ids = open(os.path.join(dirname, 'build_ids.json'), 'r')
     build_ids = json.loads(file_ids.read())
@@ -26,14 +28,17 @@ def load_builds_info(host, project_id, token, start_from=0, batch_size=3, timeou
     for i in range(start_from, len(build_ids), batch_size):
         batch = build_ids[i:i + batch_size]
 
+        time_before = time.time()
         response = requests.get(f'{host}/assignInfoCollector.html',
                                 params={'projectExternalId': project_id, 'ids': ','.join(map(str, batch))},
                                 headers={'Authorization': token}, timeout=timeout)
-
+        if not response.ok:
+            logging.info(f'Error: status code {response.status_code}')
+        time_after = time.time()
         file_info = open(os.path.join(dirname, f'builds_info_{i}_{i + batch_size - 1}.json'), 'w')
         file_info.write(response.text)
         file_info.close()
-        logging.info(f'Finished batch from {i} to {i + batch_size - 1}')
+        logging.info(f'Finished batch from {i} to {i + batch_size - 1} in {time_after - time_before} seconds')
 
 
 def parse_args():
@@ -51,7 +56,7 @@ def parse_args():
     build_info_parser = subparsers.add_parser('builds_info')
 
     build_info_parser.add_argument('-start_from', default=0, help='start position for request')
-    build_info_parser.add_argument('-batch_size', default=100, help='batch size')
+    build_info_parser.add_argument('-batch_size', default=5, help='batch size')
 
     return parser.parse_args()
 
