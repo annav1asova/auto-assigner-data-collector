@@ -12,6 +12,8 @@ import jetbrains.buildServer.serverSide.auth.AccessDeniedException;
 import jetbrains.buildServer.serverSide.auth.Permission;
 import jetbrains.buildServer.serverSide.auth.SecurityContext;
 import jetbrains.buildServer.serverSide.impl.audit.filters.TestId;
+import jetbrains.buildServer.serverSide.stat.LimitedStacktraceProcessor;
+import jetbrains.buildServer.serverSide.stat.TestOutputCollector;
 import jetbrains.buildServer.users.User;
 import jetbrains.buildServer.web.openapi.WebControllerManager;
 import org.jetbrains.annotations.NotNull;
@@ -26,6 +28,8 @@ import java.io.OutputStreamWriter;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.stream.Collectors;
+
+import static jetbrains.buildServer.serverSide.BuildStatisticsOptions.ALL_TESTS_NO_DETAILS;
 
 public class BuildInfoController extends BaseController {
     private final SBuildServer server;
@@ -70,13 +74,15 @@ public class BuildInfoController extends BaseController {
         server.getHistory().findEntries(ids).stream()
                 .filter(build -> !build.isAgentLessBuild()) // filter composite builds
                 .forEach(finishedBuild -> {
+                    TestOutputCollector testOutputCollector = new TestOutputCollector(finishedBuild);
+
                     BuildInfo buildInfo = new BuildInfo(finishedBuild);
                     List<TestInfo> tests = new ArrayList<>();
-                    finishedBuild.getFullStatistics().getAllTests().stream()
+                    finishedBuild.getBuildStatistics(ALL_TESTS_NO_DETAILS).getAllTests().stream()
                             .filter(testRun -> !testRun.getTest().getAllResponsibilities().isEmpty())
                             .limit(Limits.TEST_LIMIT)
                             .forEach(testRun -> {
-                                TestInfo testInfo = new TestInfo(testRun);
+                                TestInfo testInfo = new TestInfo(testRun, testOutputCollector);
                                 testRunsWithResponsibilities.add(testInfo);
                                 tests.add(testInfo);
                             });
