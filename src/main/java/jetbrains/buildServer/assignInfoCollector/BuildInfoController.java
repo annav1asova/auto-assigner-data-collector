@@ -58,7 +58,7 @@ public class BuildInfoController extends BaseController {
         @Nullable SProject project = getProjectByExternalId(request.getParameter("projectExternalId"));
         if (project == null) {
             throw new NotFoundException("Project with specified externalProjectId not found");
-        } else if (!mySecurityContext.getAuthorityHolder().getPermissionsGrantedForProject(project.getProjectId()).contains(Permission.EDIT_PROJECT)) {
+        } else if (!mySecurityContext.getAuthorityHolder().getPermissionsGrantedForProject(project.getProjectId()).contains(Permission.VIEW_PROJECT)) {
             throw new IllegalAccessException("User doesn't have enough permissions. " + Permission.VIEW_PROJECT.getName() + " permission required.");
         }
 
