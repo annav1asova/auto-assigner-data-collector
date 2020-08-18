@@ -106,7 +106,9 @@ public class BuildInfoController extends BaseController {
     @NotNull
     public Map<Long, List<String>> findInAudit(@NotNull final Set<Long> testNameIds, @NotNull SProject project) {
         AuditLogBuilder builder = auditLogProvider.getBuilder();
-        builder.setActionTypes(ActionType.TEST_MARK_AS_FIXED, ActionType.TEST_INVESTIGATION_ASSIGN);
+        builder.setActionTypes(ActionType.TEST_MARK_AS_FIXED,
+                ActionType.TEST_INVESTIGATION_ASSIGN,
+                ActionType.TEST_INVESTIGATION_ASSIGN_STICKY);
         Set<String> objectIds = new HashSet<>();
         testNameIds.forEach(testNameId -> {
             objectIds.add(TestId.createOn(testNameId, project.getProjectId()).asString());
