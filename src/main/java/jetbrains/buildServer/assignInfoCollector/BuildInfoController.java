@@ -71,6 +71,7 @@ public class BuildInfoController extends BaseController {
 
         List<BuildInfo> builds = new ArrayList<>();
         List<TestInfo> testRunsWithResponsibilities = new ArrayList<>();
+        Set<String> projectIds = new HashSet<>();
 
         server.getHistory().findEntries(ids).stream()
                 .filter(build -> !build.isAgentLessBuild()) // filter composite builds
@@ -89,12 +90,13 @@ public class BuildInfoController extends BaseController {
                             });
                     buildInfo.setTests(tests);
                     builds.add(buildInfo);
+                    projectIds.add(finishedBuild.getProjectId());
                 });
 
         Map<Long, List<String>> auditResult = findInAudit(testRunsWithResponsibilities.stream()
                         .map(TestInfo::getTestNameId)
                         .collect(Collectors.toSet()),
-                project);
+                projectIds);
 
         testRunsWithResponsibilities.forEach(testRun -> {
             testRun.setPreviousResponsible(auditResult.get(testRun.getTestNameId()));
@@ -105,12 +107,11 @@ public class BuildInfoController extends BaseController {
     }
 
     @NotNull
-    public Map<Long, List<String>> findInAudit(@NotNull final Set<Long> testNameIds, @NotNull SProject project) {
+    public Map<Long, List<String>> findInAudit(@NotNull final Set<Long> testNameIds, @NotNull Set<String> projectIds) {
         AuditLogBuilder builder = auditLogProvider.getBuilder();
         builder.setActionTypes(ActionType.TEST_MARK_AS_FIXED,
                 ActionType.TEST_INVESTIGATION_ASSIGN,
                 ActionType.TEST_INVESTIGATION_ASSIGN_STICKY);
-        List<String> projectIds = collectProjectHierarchyIds(project);
         Set<String> objectIds = new HashSet<>();
         for (Long testNameId : testNameIds) {
             for (String projectId : projectIds) {
@@ -158,15 +159,5 @@ public class BuildInfoController extends BaseController {
             servletResponse.setContentType("application/json");
             writer.write(myGson.toJson(responsibilities));
         }
-    }
-
-    @NotNull
-    private List<String> collectProjectHierarchyIds(@NotNull BuildProject project) {
-        List<String> result = new ArrayList<>();
-        do {
-            result.add(project.getProjectId());
-            project = project.getParentProject();
-        } while (project != null);
-        return result;
     }
 }
