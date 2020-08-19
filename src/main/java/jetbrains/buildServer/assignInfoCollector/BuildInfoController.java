@@ -2,6 +2,7 @@ package jetbrains.buildServer.assignInfoCollector;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
+import jetbrains.buildServer.BuildProject;
 import jetbrains.buildServer.controllers.BaseController;
 import jetbrains.buildServer.issueTracker.errors.NotFoundException;
 import jetbrains.buildServer.serverSide.ProjectManager;
@@ -109,10 +110,13 @@ public class BuildInfoController extends BaseController {
         builder.setActionTypes(ActionType.TEST_MARK_AS_FIXED,
                 ActionType.TEST_INVESTIGATION_ASSIGN,
                 ActionType.TEST_INVESTIGATION_ASSIGN_STICKY);
+        List<String> projectIds = collectProjectHierarchyIds(project);
         Set<String> objectIds = new HashSet<>();
-        testNameIds.forEach(testNameId -> {
-            objectIds.add(TestId.createOn(testNameId, project.getProjectId()).asString());
-        });
+        for (Long testNameId : testNameIds) {
+            for (String projectId : projectIds) {
+                objectIds.add(TestId.createOn(testNameId, projectId).asString());
+            }
+        }
 
         builder.setObjectIds(objectIds);
         List<AuditLogAction> lastActions = builder.getLogActions(-1);
@@ -154,5 +158,15 @@ public class BuildInfoController extends BaseController {
             servletResponse.setContentType("application/json");
             writer.write(myGson.toJson(responsibilities));
         }
+    }
+
+    @NotNull
+    private List<String> collectProjectHierarchyIds(@NotNull BuildProject project) {
+        List<String> result = new ArrayList<>();
+        do {
+            result.add(project.getProjectId());
+            project = project.getParentProject();
+        } while (project != null);
+        return result;
     }
 }
