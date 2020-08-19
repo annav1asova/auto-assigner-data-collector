@@ -90,13 +90,15 @@ public class BuildInfoController extends BaseController {
                             });
                     buildInfo.setTests(tests);
                     builds.add(buildInfo);
-                    projectIds.add(finishedBuild.getProjectId());
+                    projectIds.add(finishedBuild.getProjectExternalId());
                 });
 
         Map<Long, List<String>> auditResult = findInAudit(testRunsWithResponsibilities.stream()
                         .map(TestInfo::getTestNameId)
                         .collect(Collectors.toSet()),
-                projectIds);
+                projectIds.stream()
+                        .map(this::getProjectByExternalId)
+                        .collect(Collectors.toSet()));
 
         testRunsWithResponsibilities.forEach(testRun -> {
             testRun.setPreviousResponsible(auditResult.get(testRun.getTestNameId()));
@@ -107,12 +109,14 @@ public class BuildInfoController extends BaseController {
     }
 
     @NotNull
-    public Map<Long, List<String>> findInAudit(@NotNull final Set<Long> testNameIds, @NotNull Set<String> projectIds) {
+    public Map<Long, List<String>> findInAudit(@NotNull final Set<Long> testNameIds, @NotNull Set<SProject> projects) {
         AuditLogBuilder builder = auditLogProvider.getBuilder();
         builder.setActionTypes(ActionType.TEST_MARK_AS_FIXED,
                 ActionType.TEST_INVESTIGATION_ASSIGN,
                 ActionType.TEST_INVESTIGATION_ASSIGN_STICKY);
+
         Set<String> objectIds = new HashSet<>();
+        Set<String> projectIds = collectProjectsHierarchyIds(projects);
         for (Long testNameId : testNameIds) {
             for (String projectId : projectIds) {
                 objectIds.add(TestId.createOn(testNameId, projectId).asString());
@@ -159,5 +163,24 @@ public class BuildInfoController extends BaseController {
             servletResponse.setContentType("application/json");
             writer.write(myGson.toJson(responsibilities));
         }
+    }
+
+    @NotNull
+    private Set<String> collectProjectHierarchyIds(@NotNull SProject project) {
+        Set<String> result = new HashSet<>();
+        do {
+            result.add(project.getProjectId());
+            project = project.getParentProject();
+        } while (project != null);
+        return result;
+    }
+
+    @NotNull
+    private Set<String> collectProjectsHierarchyIds(@NotNull Set<SProject> projects) {
+        Set<String> result = new HashSet<>();
+        for (SProject project : projects) {
+            result.addAll(collectProjectHierarchyIds(project));
+        }
+        return result;
     }
 }
