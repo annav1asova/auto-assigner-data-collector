@@ -2,9 +2,9 @@ package jetbrains.buildServer.assignInfoCollector;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
-import jetbrains.buildServer.BuildProject;
 import jetbrains.buildServer.controllers.BaseController;
 import jetbrains.buildServer.issueTracker.errors.NotFoundException;
+import jetbrains.buildServer.serverSide.BuildStatistics;
 import jetbrains.buildServer.serverSide.ProjectManager;
 import jetbrains.buildServer.serverSide.SBuildServer;
 import jetbrains.buildServer.serverSide.SProject;
@@ -13,7 +13,6 @@ import jetbrains.buildServer.serverSide.auth.AccessDeniedException;
 import jetbrains.buildServer.serverSide.auth.Permission;
 import jetbrains.buildServer.serverSide.auth.SecurityContext;
 import jetbrains.buildServer.serverSide.impl.audit.filters.TestId;
-import jetbrains.buildServer.serverSide.stat.LimitedStacktraceProcessor;
 import jetbrains.buildServer.serverSide.stat.TestOutputCollector;
 import jetbrains.buildServer.users.User;
 import jetbrains.buildServer.web.openapi.WebControllerManager;
@@ -67,20 +66,33 @@ public class BuildInfoController extends BaseController {
             throw new IllegalAccessException("User doesn't have enough permissions. " + Permission.VIEW_PROJECT.getName() + " permission required.");
         }
 
-        List<Long> ids = Arrays.stream(request.getParameter("ids").split(",")).map(Long::parseLong).collect(Collectors.toList());
+        Map<Long, List<Long>> buildToTestsMap = new HashMap<>();
+
+        Arrays.stream(request.getParameter("ids").split(","))
+                .map(pair -> pair.split("_"))
+                .forEach(ids -> {
+                    long buildId = Long.parseLong(ids[0]);
+                    long testId = Long.parseLong(ids[1]);
+                    buildToTestsMap.putIfAbsent(buildId, new ArrayList<>());
+                    buildToTestsMap.get(buildId).add(testId);
+                });
 
         List<BuildInfo> builds = new ArrayList<>();
         List<TestInfo> testRunsWithResponsibilities = new ArrayList<>();
         Set<String> projectIds = new HashSet<>();
 
-        server.getHistory().findEntries(ids).stream()
+        server.getHistory().findEntries(buildToTestsMap.keySet()).stream()
                 .filter(build -> !build.isAgentLessBuild()) // filter composite builds
                 .forEach(finishedBuild -> {
                     TestOutputCollector testOutputCollector = new TestOutputCollector(finishedBuild);
 
                     BuildInfo buildInfo = new BuildInfo(finishedBuild);
                     List<TestInfo> tests = new ArrayList<>();
-                    finishedBuild.getBuildStatistics(ALL_TESTS_NO_DETAILS).getAllTests().stream()
+                    BuildStatistics buildStat = finishedBuild.getBuildStatistics(ALL_TESTS_NO_DETAILS);
+
+                    buildToTestsMap.get(finishedBuild.getBuildId()).stream()
+                            .map(buildStat::findTestByTestNameId)
+                            .filter(Objects::nonNull)
                             .filter(testRun -> !testRun.getTest().getAllResponsibilities().isEmpty())
                             .limit(Limits.TEST_LIMIT)
                             .forEach(testRun -> {
@@ -88,6 +100,7 @@ public class BuildInfoController extends BaseController {
                                 testRunsWithResponsibilities.add(testInfo);
                                 tests.add(testInfo);
                             });
+
                     buildInfo.setTests(tests);
                     builds.add(buildInfo);
                     projectIds.add(finishedBuild.getProjectExternalId());
