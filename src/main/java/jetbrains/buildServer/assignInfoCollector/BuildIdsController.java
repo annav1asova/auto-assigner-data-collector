@@ -12,6 +12,7 @@ import jetbrains.buildServer.serverSide.*;
 import jetbrains.buildServer.serverSide.auth.AccessDeniedException;
 import jetbrains.buildServer.serverSide.auth.Permission;
 import jetbrains.buildServer.serverSide.auth.SecurityContext;
+import jetbrains.buildServer.serverSide.stat.FirstFailedInFixedInCalculator;
 import jetbrains.buildServer.web.openapi.WebControllerManager;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -30,6 +31,7 @@ public class BuildIdsController extends BaseController {
     private final ProjectManager projectManager;
     private final InvestigationTestRunsHolder testRunsHolderCache;
     private final TestNameResponsibilityFacade responsibilityFacade;
+    private final FirstFailedInFixedInCalculator statisticsProvider;
     private final SecurityContext mySecurityContext;
 
     private final Gson myGson = new GsonBuilder().setPrettyPrinting().create();
@@ -39,11 +41,13 @@ public class BuildIdsController extends BaseController {
                               @NotNull final ProjectManager projectManager,
                               @NotNull final SecurityContext securityContext,
                               @NotNull final TestNameResponsibilityFacade responsibilityFacade,
-                              @NotNull final InvestigationTestRunsHolderImpl testRunsHolderCache) {
+                              @NotNull final InvestigationTestRunsHolderImpl testRunsHolderCache,
+                              @NotNull final FirstFailedInFixedInCalculator statisticsProvider) {
         super(server);
         this.projectManager = projectManager;
         this.responsibilityFacade = responsibilityFacade;
         this.testRunsHolderCache = testRunsHolderCache;
+        this.statisticsProvider = statisticsProvider;
         mySecurityContext = securityContext;
         manager.registerController("/buildTestIdsCollector.html", this);
     }
@@ -71,10 +75,18 @@ public class BuildIdsController extends BaseController {
 
         List<STestRun> lastTestRuns = testRunsHolderCache.getLastTestRunsInBulk(testIds, project.getProjectId(), false);
 
-        List<BuildTestId> buildsTests = lastTestRuns.stream()
+        Set<BuildTestId> buildsTests = lastTestRuns.stream()
                 .filter(testRun -> testRun.getStatus().isFailed())
-                .map(BuildTestId::new)
-                .collect(Collectors.toList());
+                .map(testRun -> {
+                    final SBuild firstFailedBuild = findFirstFailedInBuild(testRun);
+                    if (firstFailedBuild != null) {
+                        return new BuildTestId(testRun, firstFailedBuild);
+                    } else {
+                        return null;
+                    }
+                })
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet());
 
         sendResponse(response, buildsTests);
         return null;
@@ -94,8 +106,15 @@ public class BuildIdsController extends BaseController {
         return project;
     }
 
+    @Nullable
+    private SBuild findFirstFailedInBuild(@NotNull STestRun testRun) {
+        final FirstFailedInFixedInCalculator.FFIData ffiData = statisticsProvider.calculateFFIData(testRun);
+        @Nullable SBuild firstFailedBuild = ffiData.getFirstFailedIn();
+        return firstFailedBuild;
+    }
+
     private void sendResponse(@NotNull HttpServletResponse servletResponse,
-                              @NotNull List<BuildTestId> buildTestIds) throws IOException {
+                              @NotNull Set<BuildTestId> buildTestIds) throws IOException {
         try (OutputStreamWriter writer = new OutputStreamWriter(servletResponse.getOutputStream(), StandardCharsets.UTF_8)) {
             servletResponse.setContentType("application/json");
             writer.write(myGson.toJson(buildTestIds));
@@ -103,17 +122,31 @@ public class BuildIdsController extends BaseController {
     }
 
     private static class BuildTestId {
-        long buildId;
-        long testId;
+        final long buildId;
+        final long testId;
 
-        BuildTestId(STestRun testRun) {
-            buildId = testRun.getBuildId();
+        BuildTestId(STestRun testRun, SBuild build) {
+            buildId = build.getBuildId();
             testId = testRun.getTest().getTestNameId();
         }
 
         BuildTestId(long buildId, long testId) {
             this.buildId = buildId;
             this.testId = testId;
+        }
+
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) return true;
+            if (o == null || getClass() != o.getClass()) return false;
+            BuildTestId that = (BuildTestId) o;
+            return buildId == that.buildId &&
+                    testId == that.testId;
+        }
+
+        @Override
+        public int hashCode() {
+            return Objects.hash(buildId, testId);
         }
     }
 }
