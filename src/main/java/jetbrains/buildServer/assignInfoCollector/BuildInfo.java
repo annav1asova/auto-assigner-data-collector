@@ -17,7 +17,7 @@ class BuildInfo {
     private final String description;
     private final boolean isDefaultBranch;
     private final String branchName;
-    private final List<ChangeInfo> committersUsers;
+    private final List<ChangeInfo> changes;
     private final List<FailureReasonInfo> reasons;
     private List<TestInfo> tests;
     private final int testCount;
@@ -30,7 +30,7 @@ class BuildInfo {
                 .stream().map(UserInfo::new).collect(Collectors.toList());
 
         this.changeCount = build.getChanges(SelectPrevBuildPolicy.SINCE_LAST_BUILD, true).size();
-        this.committersUsers = build.getChanges(SelectPrevBuildPolicy.SINCE_LAST_BUILD, true).stream()
+        this.changes = build.getChanges(SelectPrevBuildPolicy.SINCE_LAST_BUILD, true).stream()
                 .limit(Limits.CHANGE_LIMIT)
                 .map(ChangeInfo::new)
                 .collect(Collectors.toList());

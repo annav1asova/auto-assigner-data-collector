@@ -36,7 +36,7 @@ def convert_to_data_frame(builds_info):
 
 
 all_keys = ['buildId', 'clientDate', 'committers', 'changeCount', 'comment', 'triggeredBy', 'description',
-            'isDefaultBranch', 'branchName', 'committersUsers', 'reasons', 'testCount', 'testRunId',
+            'isDefaultBranch', 'branchName', 'changes', 'reasons', 'testCount', 'testRunId',
             'testNameId', 'stacktrace', 'className', 'testMethod', 'testClass', 'testSuite',
             'duration', 'orderId', 'isFixed', 'previousResponsible']
 
